@@ -1,0 +1,6 @@
+*.pyc
+__pycache__
+# need to exclude vrep stuff
+remoteApi.so
+vrepConst.py
+vrep.py
