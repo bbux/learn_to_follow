@@ -137,7 +137,7 @@ class State(object):
 class Env(object):
     """ Class for encapsulating a vrep environment """
 
-    def __init__(self, vleft=0, vright=0):
+    def __init__(self, vleft=0, vright=0, goal_distance=1):
         """ initialize the vrep evironment
 
             params: vleft - initial left motor velocity
@@ -152,7 +152,7 @@ class Env(object):
         self.usensors = get_sensor_handles(self.client_id, "Pioneer_p3dx_ultrasonicSensor", 16)
         self.vleft = vleft
         self.vright = vright
-
+        self.goal_distance = goal_distance
 
     def get_state(self):
         """ gets the current state of the environment
@@ -161,23 +161,41 @@ class Env(object):
         """
         return read_state(self.client_id, self.target_handle, self.ref_frame, self.vleft, self.vright, self.usensors)
 
-    def set_velocity(self, vleft, vright):
-        """ set the velocity of the left and right robot motors
+    def step(self, actions):
+        """ take an action
 
-            params: vleft - left motor velocity
-                    vright - right motor velocity
+            params: action[0] = vleft - left motor velocity
+                    action[1] = vright - right motor velocity
+
+            returns: (state, reward)
         """
-        self.vleft = vleft
-        self.vright = vright
-        vrep.simxSetJointTargetVelocity(self.client_id, self.motor_left, vleft, vrep.simx_opmode_oneshot_wait)
-        vrep.simxSetJointTargetVelocity(self.client_id, self.motor_right, vright, vrep.simx_opmode_oneshot_wait)
+        self.vleft = actions[0]
+        self.vright = actions[1]
+        vrep.simxSetJointTargetVelocity(self.client_id, self.motor_left, self.vleft, vrep.simx_opmode_oneshot_wait)
+        vrep.simxSetJointTargetVelocity(self.client_id, self.motor_right, self.vright, vrep.simx_opmode_oneshot_wait)
+        state = self.get_state()
+        reward = -abs(state.dist - self.goal_distance)
+        return (state.to_list(), reward)
+        
 
+    def reset(self):
+        """ reset the state 
+
+            retruns: the current state after reset
+        """
+        self.vleft = 0
+        self.vright = 0
+        return self.get_state().to_list()
+        
     def stop(self):
         """ stop the vrep environment """
         # Now close the connection to V-REP:
         vrep.simxFinish(self.client_id)
 
 
-def make():
-    """ makes a new vrep environment """
-    return Env()
+def make(goal_distance):
+    """ makes a new vrep environment 
+        
+        params: goal_distance - the desired distance to the target
+    """
+    return Env(goal_distance=goal_distance)

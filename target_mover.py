@@ -3,8 +3,10 @@
 """
 module for holding the TargetMover class
 """
-import sys
 import vrep
+
+
+DONE=-1000000
 
 
 class TargetMover(object):
@@ -13,12 +15,10 @@ class TargetMover(object):
     def __init__(self, client_id, target_handle, path, increment=0.1):
         """ Initialize the target mover
 
-            params: client_id - to connect to vrep server with
+            params: client_id     - to connect to vrep server with
                     target_handle - handle of object being followed
-                    path - list of [RLFB] instruction for what direction to move
-                    increment - how far to move for each step
-
-            returns: state - current state of the robot
+                    path          - list of [RLFB] instruction for what direction to move
+                    increment     - how far to move for each step
         """
         self.client_id = client_id
         self.handle = target_handle
@@ -27,8 +27,14 @@ class TargetMover(object):
         self._index = 0
 
     def step(self):
-        """ move the target to the next positions specified in the path """
-        movex, movey = self.get_next_pos()
+        """ move the target to the next positions specified in the path 
+
+
+            returns: if the movement is over
+        """
+        movex, movey = self._get_next_pos()
+        if movex == DONE:
+            return True
 
         # what is our current absolute position
         _, pos = vrep.simxGetObjectPosition(self.client_id, self.handle, -1, vrep.simx_opmode_oneshot_wait)
@@ -38,12 +44,13 @@ class TargetMover(object):
 
         vrep.simxSetObjectPosition(self.client_id, self.handle, -1, (x+movex, y+movey, z), vrep.simx_opmode_oneshot_wait)
         self._index = self._index + 1
+        return False
 
-    def get_next_pos(self):
+    def _get_next_pos(self):
         """ what is the next x and y position """
         val = self.path[self._index]
         if val == "exit":
-            sys.exit("Sim Stopped")
+            return (DONE, DONE)
         elif val == "L":
             movex = -self.increment
             movey = 0.0

@@ -6,36 +6,44 @@ module for training and testing the follow models
 import time
 import vrep_env
 from target_mover import TargetMover
+from simple_actor import SimpleActor
 
-##########################################################
-#                   START SCRIPT
-##########################################################
+
 def main():
     """ run the tests """
-    env = vrep_env.make()
+
+    # how far we want to be from the target
+    goal_distance=1
+
+    # what velocity to scale by
+    base_velocity = 5.0
+
+    # create the vrep environment
+    env = vrep_env.make(goal_distance)
 
     # path to follow, just keep moving right
     path = ["R"] * 20 + ["exit"]
+ 
+    # moves the target we are trying to fallow
     mover = TargetMover(env.client_id, target_handle=env.target_handle, path=path)
 
-    goal_distance = 1
-    base_velocity = 5.0
-    vleft = 0
-    vright = 0
+    # tells us what actions to take
+    actor = SimpleActor(goal_distance, base_velocity)
+
+    # WORK starts here
+    state = env.reset()
 
     while True:
-        mover.step()
+        done = mover.step()
+        if done:
+            break
 
-        state = env.get_state()
-
-        dist_delta = state.dist - goal_distance
-        vleft = dist_delta * base_velocity
-        vright = vleft
-        print("Delta distance: %f, Velocity: %f" % (dist_delta, vleft))
-
-        env.set_velocity(vleft, vright)
+        actions = actor.choose_action(state)
+        state, reward = env.step(actions)
 
         time.sleep(1)
+
+    env.stop()
 
 
 if __name__ == "__main__":
