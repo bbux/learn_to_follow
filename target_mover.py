@@ -46,6 +46,9 @@ class TargetMover(object):
         self._index = self._index + 1
         return False
 
+    def reset(self):
+        self._index = 0
+
     def _get_next_pos(self):
         """ what is the next x and y position """
         val = self.path[self._index]

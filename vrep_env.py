@@ -134,6 +134,25 @@ class State(object):
         """
         return np.asarray([self.dist, self.theta, self.vleft, self.vright] + list(self.sensor_readings))
 
+def get_reset(client_id, handle):
+    """ gets a Reset object holding the original position and orientation of the object """
+    _, pos = vrep.simxGetObjectPosition(client_id, handle, -1, vrep.simx_opmode_oneshot_wait)
+    _, orient = vrep.simxGetObjectOrientation(client_id, handle, -1, vrep.simx_opmode_oneshot_wait)
+    return Reset(handle, pos, orient)
+    
+def reset_object(client_id, reset):
+    """ puts object back to original position """
+    vrep.simxSetObjectPosition(client_id, reset.handle, -1, reset.pos, vrep.simx_opmode_oneshot_wait)
+    vrep.simxSetObjectOrientation(client_id, reset.handle, -1, reset.orient, vrep.simx_opmode_oneshot_wait)
+        
+    
+class Reset(object):
+    """ for storing reset information """
+    def __init__(self, handle, pos, orient):
+        self.handle = handle
+        self.pos = pos
+        self.orient = orient
+        
 
 class VREP_Env(object):
     """ Class for encapsulating a vrep environment """
@@ -160,6 +179,8 @@ class VREP_Env(object):
         self.vleft = vleft
         self.vright = vright
         self.goal_distance = goal_distance
+        self.target_reset = get_reset(self.client_id, self.target_handle)
+        self.bot_reset = get_reset(self.client_id, self.ref_frame)
 
     def get_state(self):
         """ gets the current state of the environment
@@ -190,8 +211,21 @@ class VREP_Env(object):
 
             retruns: the current state after reset
         """
-        self.vleft = 0
-        self.vright = 0
+        reset_object(self.client_id, self.target_reset)
+        # TODO: this fails, may need to try to unload then reload the model?
+        #reset_object(self.client_id, self.bot_reset)
+#        vrep.simxRemoveModel(self.client_id, self.ref_frame, vrep.simx_opmode_oneshot_wait)
+#        vrep.simxLoadModel(self.client_id, "/home/user/V-REP/models/robots/mobile/pioneer p3dx.ttm",
+#                           0, vrep.simx_opmode_oneshot_wait)
+#        _, self.ref_frame = get_handle(self.client_id, 'Pioneer_p3dx')
+#        _, self.motor_left = get_handle(self.client_id, 'Pioneer_p3dx_leftMotor')
+#        _, self.motor_right = get_handle(self.client_id, 'Pioneer_p3dx_rightMotor')
+#        self.usensors = get_sensor_handles(self.client_id, "Pioneer_p3dx_ultrasonicSensor", 16)
+#        self.vleft = 0
+#        self.vright = 0
+#        vrep.simxSetJointTargetVelocity(self.client_id, self.motor_left, self.vleft, vrep.simx_opmode_oneshot_wait)
+#        vrep.simxSetJointTargetVelocity(self.client_id, self.motor_right, self.vright, vrep.simx_opmode_oneshot_wait)
+        
         return self.get_state().to_array()
         
     def stop(self):

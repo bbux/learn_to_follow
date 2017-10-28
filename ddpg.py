@@ -207,6 +207,7 @@ def train():
 
     for ep in range(MAX_EPISODES):
         s = env.reset()
+        mover.reset()
         ep_reward = 0
 
         for t in range(MAX_EP_STEPS):
