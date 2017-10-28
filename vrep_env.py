@@ -7,6 +7,7 @@ module for storing and interacting with the vrep environment
 import sys
 import math
 import vrep
+import numpy as np
 
 
 def setup_vrep():
@@ -62,7 +63,7 @@ def read_sensors(client_id, usensors):
         returns: readings - list of sensor distance readings
     """
     readings = [0] * len(usensors)
-    for i in range(0, len(usensors)-1):
+    for i in range(0, len(usensors) - 1):
         (_, _, detected_point, _, _) = vrep.simxReadProximitySensor(client_id, usensors[i],
                                                                     vrep.simx_opmode_oneshot_wait)
         dist = math.sqrt(detected_point[0]**2 + detected_point[1]**2 + detected_point[2]**2)
@@ -126,16 +127,22 @@ class State(object):
         self.vright = vright
         self.sensor_readings = sensor_readings
 
-    def to_list(self):
+    def to_array(self):
         """ turn state into more consumable form
 
             returns: list with [ dist, theta, vleft, vright,  s1 ,s2, ..., sN ]
         """
-        return [self.dist, self.theta, self.vleft, self.vright] + list(self.sensor_readings)
+        return np.asarray([self.dist, self.theta, self.vleft, self.vright] + list(self.sensor_readings))
 
 
-class Env(object):
+class VREP_Env(object):
     """ Class for encapsulating a vrep environment """
+    # distance, theta, vleft, vright, +16 distance sensors
+    state_dim = 20
+    # left motor velocity and right motor velocity
+    action_dim = 2
+    # max min velocity change?
+    action_bound = [-1, 1]
 
     def __init__(self, vleft=0, vright=0, goal_distance=1):
         """ initialize the vrep evironment
@@ -175,9 +182,9 @@ class Env(object):
         vrep.simxSetJointTargetVelocity(self.client_id, self.motor_right, self.vright, vrep.simx_opmode_oneshot_wait)
         state = self.get_state()
         reward = -abs(state.dist - self.goal_distance)
-        return (state.to_list(), reward)
+        # never done
+        return (state.to_array(), reward, False)
         
-
     def reset(self):
         """ reset the state 
 
@@ -185,7 +192,7 @@ class Env(object):
         """
         self.vleft = 0
         self.vright = 0
-        return self.get_state().to_list()
+        return self.get_state().to_array()
         
     def stop(self):
         """ stop the vrep environment """
@@ -198,4 +205,4 @@ def make(goal_distance):
         
         params: goal_distance - the desired distance to the target
     """
-    return Env(goal_distance=goal_distance)
+    return VREP_Env(goal_distance=goal_distance)
