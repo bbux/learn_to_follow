@@ -172,10 +172,7 @@ class VREP_Env(object):
         self.client_id = setup_vrep()
 
         _, self.target_handle = get_handle(self.client_id, 'Sphere')
-        _, self.ref_frame = get_handle(self.client_id, 'Pioneer_p3dx')
-        _, self.motor_left = get_handle(self.client_id, 'Pioneer_p3dx_leftMotor')
-        _, self.motor_right = get_handle(self.client_id, 'Pioneer_p3dx_rightMotor')
-        self.usensors = get_sensor_handles(self.client_id, "Pioneer_p3dx_ultrasonicSensor", 16)
+        self._load_robot_handles()
         self.vleft = vleft
         self.vright = vright
         self.goal_distance = goal_distance
@@ -212,19 +209,12 @@ class VREP_Env(object):
             retruns: the current state after reset
         """
         reset_object(self.client_id, self.target_reset)
-        # TODO: this fails, may need to try to unload then reload the model?
-        #reset_object(self.client_id, self.bot_reset)
-#        vrep.simxRemoveModel(self.client_id, self.ref_frame, vrep.simx_opmode_oneshot_wait)
-#        vrep.simxLoadModel(self.client_id, "/home/user/V-REP/models/robots/mobile/pioneer p3dx.ttm",
-#                           0, vrep.simx_opmode_oneshot_wait)
-#        _, self.ref_frame = get_handle(self.client_id, 'Pioneer_p3dx')
-#        _, self.motor_left = get_handle(self.client_id, 'Pioneer_p3dx_leftMotor')
-#        _, self.motor_right = get_handle(self.client_id, 'Pioneer_p3dx_rightMotor')
-#        self.usensors = get_sensor_handles(self.client_id, "Pioneer_p3dx_ultrasonicSensor", 16)
-#        self.vleft = 0
-#        self.vright = 0
-#        vrep.simxSetJointTargetVelocity(self.client_id, self.motor_left, self.vleft, vrep.simx_opmode_oneshot_wait)
-#        vrep.simxSetJointTargetVelocity(self.client_id, self.motor_right, self.vright, vrep.simx_opmode_oneshot_wait)
+        vrep.simxRemoveModel(self.client_id, self.ref_frame, vrep.simx_opmode_oneshot_wait)
+        vrep.simxLoadModel(self.client_id, "/home/user/V-REP/models/robots/mobile/pioneer_p3dx_script_disabled.ttm",
+                           1, vrep.simx_opmode_oneshot_wait)
+        self._load_robot_handles()
+        self.vleft = 0
+        self.vright = 0
         
         return self.get_state().to_array()
         
@@ -232,6 +222,13 @@ class VREP_Env(object):
         """ stop the vrep environment """
         # Now close the connection to V-REP:
         vrep.simxFinish(self.client_id)
+
+    def _load_robot_handles(self):
+        """ loads/reloads the handles for the robot """
+        _, self.ref_frame = get_handle(self.client_id, 'Pioneer_p3dx')
+        _, self.motor_left = get_handle(self.client_id, 'Pioneer_p3dx_leftMotor')
+        _, self.motor_right = get_handle(self.client_id, 'Pioneer_p3dx_rightMotor')
+        self.usensors = get_sensor_handles(self.client_id, "Pioneer_p3dx_ultrasonicSensor", 16)
 
 
 def make(goal_distance):
