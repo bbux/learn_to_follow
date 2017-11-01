@@ -8,7 +8,7 @@ import sys
 import math
 import vrep
 import numpy as np
-
+import time
 
 def setup_vrep():
     """ sets up and connects to the vrep server
@@ -132,7 +132,9 @@ class State(object):
 
             returns: list with [ dist, theta, vleft, vright,  s1 ,s2, ..., sN ]
         """
-        return np.asarray([self.dist, self.theta, self.vleft, self.vright] + list(self.sensor_readings))
+        #return np.asarray([self.dist, self.theta, self.vleft, self.vright] + list(self.sensor_readings))
+        #return np.asarray([self.dist, self.theta, self.vleft, self.vright])
+        return np.asarray([self.dist])
 
 def get_reset(client_id, handle):
     """ gets a Reset object holding the original position and orientation of the object """
@@ -157,13 +159,13 @@ class Reset(object):
 class VREP_Env(object):
     """ Class for encapsulating a vrep environment """
     # distance, theta, vleft, vright, +16 distance sensors
-    state_dim = 20
+    state_dim = 1
     # left motor velocity and right motor velocity
     action_dim = 2
     # max min velocity change?
     action_bound = [-1, 1]
 
-    def __init__(self, vleft=0, vright=0, goal_distance=1):
+    def __init__(self, rewarder, vleft=0, vright=0, goal_distance=1, max_delta=1, sleep_time=0.1):
         """ initialize the vrep evironment
 
             params: vleft - initial left motor velocity
@@ -173,11 +175,13 @@ class VREP_Env(object):
 
         _, self.target_handle = get_handle(self.client_id, 'Sphere')
         self._load_robot_handles()
+        self.rewarder = rewarder
         self.vleft = vleft
         self.vright = vright
         self.goal_distance = goal_distance
+        self.max_delta = max_delta
+        self.sleep_time = sleep_time
         self.target_reset = get_reset(self.client_id, self.target_handle)
-        self.bot_reset = get_reset(self.client_id, self.ref_frame)
 
     def get_state(self):
         """ gets the current state of the environment
@@ -194,14 +198,15 @@ class VREP_Env(object):
 
             returns: (state, reward)
         """
+        orig_state = self.get_state()
         self.vleft = actions[0]
         self.vright = actions[1]
         vrep.simxSetJointTargetVelocity(self.client_id, self.motor_left, self.vleft, vrep.simx_opmode_oneshot_wait)
         vrep.simxSetJointTargetVelocity(self.client_id, self.motor_right, self.vright, vrep.simx_opmode_oneshot_wait)
-        state = self.get_state()
-        reward = -abs(state.dist - self.goal_distance)
+        time.sleep(self.sleep_time)
+        new_state = self.get_state()
         # never done
-        return (state.to_array(), reward, False)
+        return (new_state.to_array(), self.rewarder.calculate_reward(orig_state, new_state), self._is_done(new_state))
         
     def reset(self):
         """ reset the state 
@@ -222,6 +227,30 @@ class VREP_Env(object):
         """ stop the vrep environment """
         # Now close the connection to V-REP:
         vrep.simxFinish(self.client_id)
+
+    def _is_done(self, state):
+        """ have we deviated outside of acceptable range """
+        delta = abs(state.dist - self.goal_distance)
+        return delta > self.max_delta
+
+    def _calculate_reward(self, orig_state, new_state):
+        """ calculates the reward based on if the action is moving the robot closer to the goal or farther away """
+        delta_orig = abs(orig_state.dist - self.goal_distance)
+        delta_new = abs(new_state.dist - self.goal_distance)
+        reward = 0
+        # this means we are going in the correct direction
+        if delta_new < delta_orig:
+            reward += 1
+            # if one length away add extra bonus
+            if delta_new < self.goal_distance:
+                reward += 1
+            # if half a length add another bonus
+            if delta_new < self.goal_distance/2.0:
+                reward += 1
+        else:
+            reward += -1
+       
+        return reward
 
     def _load_robot_handles(self):
         """ loads/reloads the handles for the robot """

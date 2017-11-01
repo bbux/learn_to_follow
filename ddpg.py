@@ -12,23 +12,25 @@ import os
 import shutil
 from vrep_env import VREP_Env
 from target_mover import TargetMover
+import rewards
 
 np.random.seed(1)
 tf.set_random_seed(1)
 
 MAX_EPISODES = 600
-MAX_EP_STEPS = 20
-LR_A = 1e-4  # learning rate for actor
-LR_C = 1e-4  # learning rate for critic
+MAX_EP_STEPS = 100
+LR_A = 1e-3  # learning rate for actor
+LR_C = 1e-3  # learning rate for critic
 GAMMA = 0.9  # reward discount
 REPLACE_ITER_A = 1100
 REPLACE_ITER_C = 1000
-MEMORY_CAPACITY = 5000
+MEMORY_CAPACITY = 200
 BATCH_SIZE = 16
 VAR_MIN = 0.1
 LOAD = False
+GOAL_DISTANCE=1.0
 
-env = VREP_Env()
+env = VREP_Env(rewards.default(GOAL_DISTANCE), goal_distance=GOAL_DISTANCE)
 STATE_DIM = env.state_dim
 ACTION_DIM = env.action_dim
 ACTION_BOUND = env.action_bound
@@ -213,14 +215,16 @@ def train():
         for t in range(MAX_EP_STEPS):
         # while True:
             done = mover.step()
+            if done:
+                break;
             # Added exploration noise
             a = actor.choose_action(s)
             a = np.clip(np.random.normal(a, var), *ACTION_BOUND)    # add randomness to action selection for exploration
-            s_, r, _ = env.step(a)
+            s_, r, done = env.step(a)
             M.store_transition(s, a, r, s_)
 
             if M.pointer > MEMORY_CAPACITY:
-                var = max([var*.9999, VAR_MIN])    # decay the action randomness
+                var = max([var * 0.999, VAR_MIN])    # decay the action randomness
                 b_M = M.sample(BATCH_SIZE)
                 b_s = b_M[:, :STATE_DIM]
                 b_a = b_M[:, STATE_DIM: STATE_DIM + ACTION_DIM]
