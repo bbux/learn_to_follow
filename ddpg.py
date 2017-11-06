@@ -18,14 +18,14 @@ import memory
 np.random.seed(1)
 tf.set_random_seed(1)
 
-MAX_EPISODES = 600
+MAX_EPISODES = 5000
 MAX_EP_STEPS = 100
 LR_A = 1e-3  # learning rate for actor
 LR_C = 1e-3  # learning rate for critic
 GAMMA = 0.9  # reward discount
 REPLACE_ITER_A = 1100
 REPLACE_ITER_C = 1000
-MEMORY_CAPACITY = 200
+MEMORY_CAPACITY = 5000
 BATCH_SIZE = 16
 VAR_MIN = 0.1
 LOAD = False
@@ -178,9 +178,10 @@ path = ["R"] * 20 + ["exit"]
 mover = TargetMover(env.client_id, target_handle=env.target_handle, path=path)
 
 M = memory.Memory(MEMORY_CAPACITY, dims=2 * STATE_DIM + ACTION_DIM + 1)
+M.load("/tmp/learn_to_follow_mem")
 
 saver = tf.train.Saver()
-path = './vrep-train'
+path = '../vrep-train'
 
 if LOAD:
     saver.restore(sess, tf.train.latest_checkpoint(path))
@@ -206,6 +207,9 @@ def train():
             a = np.clip(np.random.normal(a, var), *ACTION_BOUND)    # add randomness to action selection for exploration
             s_, r, done = env.step(a)
             M.store_transition(s, a, r, s_)
+            print("Distance: %f, Delta: %f, Velocity: L %f R %f, Reward: %f" % 
+                (s[0], (s[0] - GOAL_DISTANCE), a[0], a[1], r))
+            
 
             if M.pointer > MEMORY_CAPACITY:
                 var = max([var * 0.999, VAR_MIN])    # decay the action randomness

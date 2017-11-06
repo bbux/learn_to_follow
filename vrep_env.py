@@ -9,6 +9,7 @@ import math
 import vrep
 import numpy as np
 import time
+import rewards
 
 def setup_vrep():
     """ sets up and connects to the vrep server
@@ -84,9 +85,10 @@ def read_state(client_id, target_handle, ref_frame, vleft, vright, usensors):
         returns: state - current state of the robot
     """
     _, pos = vrep.simxGetObjectPosition(client_id, target_handle, ref_frame, vrep.simx_opmode_oneshot_wait)
+    _, orient = vrep.simxGetObjectOrientation (client_id, target_handle, ref_frame, vrep.simx_opmode_oneshot_wait)
+    
     dist = calculate_distance(pos)
-    angle = calculate_angle(pos)
-    return State(dist, angle, vleft, vright, read_sensors(client_id, usensors))
+    return State(dist, orient[2], vleft, vright, read_sensors(client_id, usensors))
 
 
 def calculate_distance(pos):
@@ -99,22 +101,13 @@ def calculate_distance(pos):
     return math.sqrt(pos[0]**2 + pos[1]**2)
 
 
-def calculate_angle(pos):
-    """ calculates the angle from the current measured position
-
-        params: pos - list of (x, y, z) measurements
-
-        returns: angle - in degrees
-    """
-    return math.degrees(math.atan2(pos[1], pos[0]))
-
 class State(object):
     """ for storing the state elements of the robot """
     def __init__(self, dist, theta, vleft, vright, sensor_readings=None):
         """ constructs the state object
 
             params: dist - the distance from the target
-                    theta - the angle to the target in degrees
+                    theta - the relative orientation to the target in radians
                     vleft - current left motor velocity
                     vright - current right motor velocity
                     sensor_readings - list of sensor distance readings
@@ -134,7 +127,7 @@ class State(object):
         """
         #return np.asarray([self.dist, self.theta, self.vleft, self.vright] + list(self.sensor_readings))
         #return np.asarray([self.dist, self.theta, self.vleft, self.vright])
-        return np.asarray([self.dist])
+        return np.asarray([self.dist, self.theta])
 
 def get_reset(client_id, handle):
     """ gets a Reset object holding the original position and orientation of the object """
@@ -159,7 +152,7 @@ class Reset(object):
 class VREP_Env(object):
     """ Class for encapsulating a vrep environment """
     # distance, theta, vleft, vright, +16 distance sensors
-    state_dim = 1
+    state_dim = 2
     # left motor velocity and right motor velocity
     action_dim = 2
     # max min velocity change?
@@ -260,9 +253,11 @@ class VREP_Env(object):
         self.usensors = get_sensor_handles(self.client_id, "Pioneer_p3dx_ultrasonicSensor", 16)
 
 
-def make(goal_distance):
+def make(goal_distance, rewarder=None):
     """ makes a new vrep environment 
         
         params: goal_distance - the desired distance to the target
     """
-    return VREP_Env(goal_distance=goal_distance)
+    if rewarder is None:
+        rewarder = rewards.default(goal_distance)
+    return VREP_Env(rewarder, goal_distance=goal_distance)

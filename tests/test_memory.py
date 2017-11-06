@@ -17,9 +17,13 @@ def test_save_load():
     mem.save("/tmp/test_mem_save")
     
     
-    mem = memory.Memory(10, dims=2 * STATE_DIM + ACTION_DIM + 1)
+    mem = memory.Memory(12, dims=2 * STATE_DIM + ACTION_DIM + 1)
+    mem.store_transition(1, [1, 1], 1, 1)
     mem.load("/tmp/test_mem_save")
     
     assert np.array_equal(saved_data, mem.data)
+    # memory is full should be pointing to the end
+    assert mem.pointer == len(mem.data) - 1
+    assert mem.capacity == 10
     
     

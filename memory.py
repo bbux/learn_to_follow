@@ -56,3 +56,7 @@ class Memory(object):
         """
         with open(location, "rb") as file_handle:
             self.data = np.load(file_handle)
+        # data is loaded, pointer is at end
+        self.pointer = len(self.data) - 1
+        self.capacity = len(self.data)
+
