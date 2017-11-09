@@ -12,6 +12,17 @@ class SimpleActor(object):
         self.goal_distance = goal_distance
         self.base_velocity = base_velocity
 
+    def update(self, s, a, r, s_):
+        """ update actor policy base on state and reward
+
+            params: s  - original state
+                    a  - action
+                    r  - reward for action
+                    s_ - next state
+        """
+        # noop
+        return
+
     def choose_action(self, state):
         """ choose actions given the current state
 

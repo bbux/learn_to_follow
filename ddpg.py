@@ -18,20 +18,20 @@ import memory
 np.random.seed(1)
 tf.set_random_seed(1)
 
-MAX_EPISODES = 5000
+MAX_EPISODES = 2000
 MAX_EP_STEPS = 100
 LR_A = 1e-3  # learning rate for actor
 LR_C = 1e-3  # learning rate for critic
 GAMMA = 0.9  # reward discount
 REPLACE_ITER_A = 1100
 REPLACE_ITER_C = 1000
-MEMORY_CAPACITY = 5000
-BATCH_SIZE = 16
+MEMORY_CAPACITY = 10000
+BATCH_SIZE = 64
 VAR_MIN = 0.1
-LOAD = False
+LOAD = True
 GOAL_DISTANCE=1.0
 
-env = VREP_Env(rewards.default(GOAL_DISTANCE), goal_distance=GOAL_DISTANCE)
+env = VREP_Env(rewards.graduated(GOAL_DISTANCE), goal_distance=GOAL_DISTANCE)
 STATE_DIM = env.state_dim
 ACTION_DIM = env.action_dim
 ACTION_BOUND = env.action_bound
@@ -173,12 +173,14 @@ actor.add_grad_to_graph(critic.a_grads)
 
 # path to follow, just keep moving right
 path = ["R"] * 20 + ["exit"]
+path = ["R"] * 20 + ["B"] * 20 + ["L"] * 20 + ["F"] * 20 + ["exit"]
  
 # moves the target we are trying to fallow
 mover = TargetMover(env.client_id, target_handle=env.target_handle, path=path)
 
 M = memory.Memory(MEMORY_CAPACITY, dims=2 * STATE_DIM + ACTION_DIM + 1)
-M.load("/tmp/learn_to_follow_mem")
+M.load("/home/user/learn_to_follow_mem_10k_graduated")
+rewards_over_time = np.zeros(MAX_EPISODES)
 
 saver = tf.train.Saver()
 path = '../vrep-train'
@@ -199,17 +201,16 @@ def train():
 
         for t in range(MAX_EP_STEPS):
         # while True:
-            done = mover.step()
-            if done:
-                break;
+            mover_done = mover.step()
+            
             # Added exploration noise
             a = actor.choose_action(s)
             a = np.clip(np.random.normal(a, var), *ACTION_BOUND)    # add randomness to action selection for exploration
-            s_, r, done = env.step(a)
+            s_, r, env_done = env.step(a)
             M.store_transition(s, a, r, s_)
-            print("Distance: %f, Delta: %f, Velocity: L %f R %f, Reward: %f" % 
-                (s[0], (s[0] - GOAL_DISTANCE), a[0], a[1], r))
-            
+            print("%d, Distance: %f, Orientation: %f, Delta: %f, Velocity: L %f R %f, Reward: %f" % 
+                (t, s[0], s[1], (s[0] - GOAL_DISTANCE), a[0], a[1], r))
+    
 
             if M.pointer > MEMORY_CAPACITY:
                 var = max([var * 0.999, VAR_MIN])    # decay the action randomness
@@ -225,6 +226,7 @@ def train():
             s = s_
             ep_reward += r
 
+            done = mover_done or env_done
             if t == MAX_EP_STEPS-1 or done:
             # if done:
                 result = '| done' if done else '| ----'
@@ -234,20 +236,27 @@ def train():
                       '| Explore: %.2f' % var,
                       )
                 break
+        # end for
+        rewards_over_time[ep] = ep_reward
 
     if os.path.isdir(path): shutil.rmtree(path)
     os.mkdir(path)
     ckpt_path = os.path.join(path, 'DDPG.ckpt')
     save_path = saver.save(sess, ckpt_path, write_meta_graph=False)
     print("\nSave Model %s\n" % save_path)
-
+    with open(os.path.join(path, 'reward_over_time'), "wb") as file_handle:
+        np.save(file_handle, rewards_over_time)
+    print("\nSaved Reward Over Time")
 
 def eval():
     s = env.reset()
     while True:
+        mover_done = mover.step()
         a = actor.choose_action(s)
-        s_, r, done = env.step(a)
+        s_, r, env_done = env.step(a)
         s = s_
+        if mover_done or env_done:
+            break;
 
 if __name__ == '__main__':
     if LOAD:
