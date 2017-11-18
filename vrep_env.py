@@ -85,10 +85,9 @@ def read_state(client_id, target_handle, ref_frame, vleft, vright, usensors):
         returns: state - current state of the robot
     """
     _, pos = vrep.simxGetObjectPosition(client_id, target_handle, ref_frame, vrep.simx_opmode_oneshot_wait)
-    _, orient = vrep.simxGetObjectOrientation (client_id, target_handle, ref_frame, vrep.simx_opmode_oneshot_wait)
+    _, orient = vrep.simxGetObjectOrientation (client_id, ref_frame, target_handle, vrep.simx_opmode_oneshot_wait)
     
-    dist = calculate_distance(pos)
-    return State(dist, orient[2], vleft, vright, read_sensors(client_id, usensors))
+    return State(pos[0], pos[1], orient[2], vleft, vright, read_sensors(client_id, usensors))
 
 
 def calculate_distance(pos):
@@ -103,10 +102,11 @@ def calculate_distance(pos):
 
 class State(object):
     """ for storing the state elements of the robot """
-    def __init__(self, dist, theta, vleft, vright, sensor_readings=None):
+    def __init__(self, xdist, ydist, theta, vleft, vright, sensor_readings=None):
         """ constructs the state object
 
-            params: dist - the distance from the target
+            params: xdist - the distance from the target on x axis
+                    ydist - the distance from the target on y axis
                     theta - the relative orientation to the target in radians
                     vleft - current left motor velocity
                     vright - current right motor velocity
@@ -114,7 +114,8 @@ class State(object):
 
             returns: state - current state of the robot
         """
-        self.dist = dist
+        self.xdist = xdist
+        self.ydist = ydist
         self.theta = theta
         self.vleft = vleft
         self.vright = vright
@@ -123,11 +124,19 @@ class State(object):
     def to_array(self):
         """ turn state into more consumable form
 
-            returns: list with [ dist, theta, vleft, vright,  s1 ,s2, ..., sN ]
+            returns: list with [ xdist, ydist, orientation, relative orientation, vleft, vright,  s1 ,s2, ..., sN ]
         """
         #return np.asarray([self.dist, self.theta, self.vleft, self.vright] + list(self.sensor_readings))
         #return np.asarray([self.dist, self.theta, self.vleft, self.vright])
-        return np.asarray([self.dist, self.theta])
+        return np.asarray([self.xdist, self.ydist, self.theta, self.relative_orientation()])
+
+    def dist(self):
+        """ euclidean distance to target """
+        return calculate_distance((self.xdist, self.ydist))
+
+    def relative_orientation(self):
+        return math.atan2(self.ydist, self.xdist)
+
 
 def get_reset(client_id, handle):
     """ gets a Reset object holding the original position and orientation of the object """
@@ -151,8 +160,8 @@ class Reset(object):
 
 class VREP_Env(object):
     """ Class for encapsulating a vrep environment """
-    # distance, theta, vleft, vright, +16 distance sensors
-    state_dim = 2
+    # x distance, y distance, orientation, relative orientation, +16 distance sensors
+    state_dim = 4
     # left motor velocity and right motor velocity
     action_dim = 2
     # max min velocity change?
@@ -223,7 +232,7 @@ class VREP_Env(object):
 
     def _is_done(self, state):
         """ have we deviated outside of acceptable range """
-        delta = abs(state.dist - self.goal_distance)
+        delta = abs(state.dist() - self.goal_distance)
         return delta > self.max_delta
 
     def _calculate_reward(self, orig_state, new_state):

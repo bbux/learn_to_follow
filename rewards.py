@@ -47,8 +47,8 @@ class IncrementalReward(BaseRewarder):
 
     def calculate_reward(self, orig_state, new_state):
         """ calculates the reward based on if the how far from goal the robot is  """
-        delta_orig = abs(orig_state.dist - self.goal_distance)
-        delta_new = abs(new_state.dist - self.goal_distance)
+        delta_orig = abs(orig_state.dist() - self.goal_distance)
+        delta_new = abs(new_state.dist() - self.goal_distance)
         reward = 0
         # this means we are going in the correct direction
         if delta_new < delta_orig:
@@ -69,7 +69,7 @@ class GraduatedReward(BaseRewarder):
         """ calculates the reward based on graduated rewards  """
         # only care about new state, don't care how we got here
         dist_reward = 0
-        actual_dist_delta = abs(new_state.dist - self.goal_distance)
+        actual_dist_delta = abs(new_state.dist() - self.goal_distance)
         for delta, graduated_reward in DISTANCE_REWARD_MATRIX:
             if actual_dist_delta < delta:
                 dist_reward = graduated_reward
@@ -93,8 +93,8 @@ class MoveCloserRewarder(BaseRewarder):
 
     def calculate_reward(self, orig_state, new_state):
         """ calculates the reward based on if the action is moving the robot closer to the goal or farther away """
-        delta_orig = abs(orig_state.dist - self.goal_distance)
-        delta_new = abs(new_state.dist - self.goal_distance)
+        delta_orig = abs(orig_state.dist() - self.goal_distance)
+        delta_new = abs(new_state.dist() - self.goal_distance)
         reward = 0
         # not a big enough change
         if abs(delta_orig - delta_new) < 0.01:

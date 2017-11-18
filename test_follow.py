@@ -17,22 +17,20 @@ def main():
     # how far we want to be from the target
     goal_distance=1
 
-    # what velocity to scale by
-    base_velocity = 3.0
-
     # create the vrep environment
     env = vrep_env.make(goal_distance, rewarder=rewards.graduated(goal_distance))
     
     mem = memory.Memory(MEMORY_CAPACITY, dims=2 * env.state_dim + env.action_dim + 1)
 
     # path to follow, just keep moving right
-    path = ["R"] * 20 + ["exit"]
+    #path = ["R"] * 20 + ["exit"]
+    path = ["F"] * 7 + ["R"] * 7 + ["B"] * 7 + ["L"] * 7 + ["exit"]
  
     # moves the target we are trying to fallow
     mover = TargetMover(env.client_id, target_handle=env.target_handle, path=path)
 
     # tells us what actions to take
-    actor = SimpleActor(goal_distance, base_velocity)
+    actor = SimpleActor(goal_distance)
     
     cumulative_reward = 0
 
@@ -57,8 +55,8 @@ def main():
             s = s_
             cumulative_reward += r
             
-            print("Distance: %f, Orientation: %f, Delta: %f, Velocity: L %f R %f, Reward: %f" % 
-                (s[0], s[1], (s[0] - goal_distance), a[0], a[1], r))
+            print("X Pos: %f, Y Pos : %f, Velocity: L %f R %f, Reward: %f" % 
+                (s[0], s[1], a[0], a[1], r))
     
             if done:
                 break;
