@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 adapted from: https://github.com/MorvanZhou/Reinforcement-learning-with-tensorflow/blob/master/experiments/Robot_arm/DDPG.py
 
@@ -10,6 +11,7 @@ import tensorflow as tf
 import numpy as np
 import os
 import shutil
+import argparse
 from vrep_env import VREP_Env
 from target_mover import TargetMover
 import rewards
@@ -163,7 +165,11 @@ class Critic(object):
         self.t_replace_counter += 1
 
 
-
+#################################3
+# Beginning of script
+# Start defining stuff at module scope
+# TODO: clean this up
+##################################
 sess = tf.Session()
 
 # Create actor and critic.
@@ -173,22 +179,27 @@ actor.add_grad_to_graph(critic.a_grads)
 
 # path to follow, just keep moving right
 path = ["R"] * 20 + ["exit"]
-path = ["R"] * 20 + ["B"] * 20 + ["L"] * 20 + ["F"] * 20 + ["exit"]
+# go in a circle
+path = ["R"] * 7 + ["B"] * 7 + ["L"] * 7 + ["F"] * 7 + ["exit"]
  
 # moves the target we are trying to fallow
 mover = TargetMover(env.client_id, target_handle=env.target_handle, path=path)
 
+# buffer to store the state, actioin, reward info for use by actor and critic learning
 M = memory.Memory(MEMORY_CAPACITY, dims=2 * STATE_DIM + ACTION_DIM + 1)
-M.load("/home/user/learn_to_follow_mem_10k_graduated")
 rewards_over_time = np.zeros(MAX_EPISODES)
 
 saver = tf.train.Saver()
-path = '../vrep-train'
 
-if LOAD:
-    saver.restore(sess, tf.train.latest_checkpoint(path))
-else:
-    sess.run(tf.global_variables_initializer())
+
+def setup(args):
+    if args.mode == "load":
+        saver.restore(sess, tf.train.latest_checkpoint(args.save_path))
+    else:
+        sess.run(tf.global_variables_initializer())
+    if args.loadmempath:
+        M.load(args.loadmempath)
+
 
 
 def train():
@@ -258,8 +269,20 @@ def eval():
         if mover_done or env_done:
             break;
 
-if __name__ == '__main__':
-    if LOAD:
+def main():
+    parser = argparse.ArgumentParser(description='Run DDPG against v-rep environment.')
+    parser.add_argument('--mode', required=True, choices=["train", "load"],
+                        help='what mode to run in')
+    parser.add_argument('--save-path', dest='save_path', required=True, default="../vrep-train",
+                        help='Where to save to or load from')
+    parser.add_argument('--load-mem-path', dest='loadmempath', required=False, default=None,
+                        help='path to generated mem file') 
+    args = parser.parse_args()
+    setup(args)
+    if args.mode == "load":
         eval()
     else:
         train()
+
+if __name__ == '__main__':
+    main()
