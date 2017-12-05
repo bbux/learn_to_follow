@@ -4,7 +4,6 @@
 module for storing and interacting with the vrep environment
 """
 
-import sys
 import math
 import vrep
 import numpy as np
@@ -22,7 +21,7 @@ def setup_vrep():
         print ('Connected to remote API server')
     else:
         print ('Failed connecting to remote API server')
-        sys.exit('Could not connect')
+        raise Exception('Could not connect')
     return client_id
 
 
@@ -165,7 +164,7 @@ class VREP_Env(object):
     # left motor velocity and right motor velocity
     action_dim = 2
     # max min velocity change?
-    action_bound = [-1, 1]
+    action_bound = [-2.5, 2.5]
 
     def __init__(self, rewarder, vleft=0, vright=0, goal_distance=1, max_delta=1, sleep_time=0.1):
         """ initialize the vrep evironment
@@ -207,7 +206,6 @@ class VREP_Env(object):
         vrep.simxSetJointTargetVelocity(self.client_id, self.motor_right, self.vright, vrep.simx_opmode_oneshot_wait)
         time.sleep(self.sleep_time)
         new_state = self.get_state()
-        # never done
         return (new_state.to_array(), self.rewarder.calculate_reward(orig_state, new_state), self._is_done(new_state))
         
     def reset(self):
