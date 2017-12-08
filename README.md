@@ -16,7 +16,7 @@ robot met these goals.
 ## Running
 
 To run, first set up V-REP and load the scene from vrep_scenes/straightline_no_obs_follow.ttt.  This scene will have the core components
-needed to do train the basic scenarios that have been created up to this point.  There is a customized model for the pioneer p3dx in the
+needed to train the basic scenarios that have been created up to this point.  There is a customized model for the pioneer p3dx in the
 vrep_models folder.  The model that comes with V-REP has a built in script that conflicts with the custom environment controller. There may
 be places in the code where the location of the model is hard coded.  Be sure to update these. Next start the V-REP simulation then execute
 either the training or testing ddpg modes (see below).
